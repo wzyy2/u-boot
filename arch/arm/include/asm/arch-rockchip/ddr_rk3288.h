@@ -434,10 +434,6 @@ enum {
 #define DDR3_DLL_DISABLE		1
 
 /*
- *TODO(sjg@chromium.org): We use a PMU register to store SDRAM information for
- * passing from SPL to U-Boot. It would probably be better to use a normal C
- * structure in SRAM.
- *
  * sys_reg bitfield struct
  * [31] row_3_4_ch1
  * [30] row_3_4_ch0
@@ -459,26 +455,26 @@ enum {
  * [3:2] bw_ch0
  * [1:0] dbw_ch0
 */
-#define SYS_REG_DDRTYPE_SHIFT		13
-#define SYS_REG_DDRTYPE_MASK		7
-#define SYS_REG_NUM_CH_SHIFT		12
-#define SYS_REG_NUM_CH_MASK		1
-#define SYS_REG_ROW_3_4_SHIFT(ch)	(30 + (ch))
-#define SYS_REG_ROW_3_4_MASK		1
-#define SYS_REG_CHINFO_SHIFT(ch)	(28 + (ch))
-#define SYS_REG_RANK_SHIFT(ch)		(11 + (ch) * 16)
-#define SYS_REG_RANK_MASK		1
-#define SYS_REG_COL_SHIFT(ch)		(9 + (ch) * 16)
-#define SYS_REG_COL_MASK		3
-#define SYS_REG_BK_SHIFT(ch)		(8 + (ch) * 16)
-#define SYS_REG_BK_MASK			1
-#define SYS_REG_CS0_ROW_SHIFT(ch)	(6 + (ch) * 16)
-#define SYS_REG_CS0_ROW_MASK		3
-#define SYS_REG_CS1_ROW_SHIFT(ch)	(4 + (ch) * 16)
-#define SYS_REG_CS1_ROW_MASK		3
-#define SYS_REG_BW_SHIFT(ch)		(2 + (ch) * 16)
-#define SYS_REG_BW_MASK			3
-#define SYS_REG_DBW_SHIFT(ch)		((ch) * 16)
-#define SYS_REG_DBW_MASK		3
+#define SYS_REG_ENC_ROW_3_4(n, ch)	((n) << (30 + (ch)))
+#define SYS_REG_DEC_ROW_3_4(n, ch)	((n >> (30 + ch)) & 0x1)
+#define SYS_REG_ENC_CHINFO(ch)		(1 << (28 + (ch)))
+#define SYS_REG_ENC_DDRTYPE(n)		((n) << 13)
+#define SYS_REG_ENC_NUM_CH(n)		(((n) - 1) << 12)
+#define SYS_REG_DEC_NUM_CH(n)		(1 + ((n >> 12) & 0x1))
+#define SYS_REG_ENC_RANK(n, ch)		(((n) - 1) << (11 + ((ch) * 16)))
+#define SYS_REG_DEC_RANK(n, ch)		(1 + ((n >> (11 + 16 * ch)) & 0x1))
+#define SYS_REG_ENC_COL(n, ch)		(((n) - 9) << (9 + ((ch) * 16)))
+#define SYS_REG_DEC_COL(n, ch)		(9 + ((n >> (9 + 16 * ch)) & 0x3))
+#define SYS_REG_ENC_BK(n, ch)		(((n) == 3 ? 0 : 1) \
+					<< (8 + ((ch) * 16)))
+#define SYS_REG_DEC_BK(n, ch)		(3 - ((n >> (8 + 16 * ch)) & 0x1))
+#define SYS_REG_ENC_CS0_ROW(n, ch)	(((n) - 13) << (6 + ((ch) * 16)))
+#define SYS_REG_DEC_CS0_ROW(n, ch)	(13 + ((n >> (6 + 16 * ch)) & 0x3))
+#define SYS_REG_ENC_CS1_ROW(n, ch)	(((n) - 13) << (4 + ((ch) * 16)))
+#define SYS_REG_DEC_CS1_ROW(n, ch)	(13 + ((n >> (4 + 16 * ch)) & 0x3))
+#define SYS_REG_ENC_BW(n, ch)		((2 >> (n)) << (2 + ((ch) * 16)))
+#define SYS_REG_DEC_BW(n, ch)		(2 >> ((n >> (2 + 16 * ch)) & 0x3))
+#define SYS_REG_ENC_DBW(n, ch)		((2 >> (n)) << (0 + ((ch) * 16)))
+#define SYS_REG_DEC_DBW(n, ch)		(2 >> ((n >> (0 + 16 * ch)) & 0x3))
 
 #endif

@@ -6,7 +6,6 @@
  *
  * Adapted from coreboot.
  */
-
 #include <common.h>
 #include <clk.h>
 #include <dm.h>
@@ -22,8 +21,6 @@
 #include <asm/arch/pmu_rk3288.h>
 #include <asm/arch/sdram.h>
 #include <linux/err.h>
-#include <power/regulator.h>
-#include <power/rk808_pmic.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -402,23 +399,23 @@ static void set_bandwidth_ratio(const struct chan_info *chan, u32 channel,
 
 	if (n == 1) {
 		setbits_le32(&pctl->ppcfg, 1);
-		rk_setreg(&grf->soc_con0, 1 << (8 + channel));
+		writel(RK_SETBITS(1 << (8 + channel)), &grf->soc_con0);
 		setbits_le32(&msch->ddrtiming, 1 << 31);
 		/* Data Byte disable*/
 		clrbits_le32(&publ->datx8[2].dxgcr, 1);
 		clrbits_le32(&publ->datx8[3].dxgcr, 1);
-		/* disable DLL */
+		/*disable DLL */
 		setbits_le32(&publ->datx8[2].dxdllcr, DXDLLCR_DLLDIS);
 		setbits_le32(&publ->datx8[3].dxdllcr, DXDLLCR_DLLDIS);
 	} else {
 		clrbits_le32(&pctl->ppcfg, 1);
-		rk_clrreg(&grf->soc_con0, 1 << (8 + channel));
+		writel(RK_CLRBITS(1 << (8 + channel)), &grf->soc_con0);
 		clrbits_le32(&msch->ddrtiming, 1 << 31);
 		/* Data Byte enable*/
 		setbits_le32(&publ->datx8[2].dxgcr, 1);
 		setbits_le32(&publ->datx8[3].dxgcr, 1);
 
-		/* enable DLL */
+		/*enable DLL */
 		clrbits_le32(&publ->datx8[2].dxdllcr, DXDLLCR_DLLDIS);
 		clrbits_le32(&publ->datx8[3].dxdllcr, DXDLLCR_DLLDIS);
 		/* reset DLL */
@@ -551,29 +548,30 @@ static void dram_cfg_rbc(const struct chan_info *chan, u32 chnum,
 static void dram_all_config(const struct dram_info *dram,
 			    const struct rk3288_sdram_params *sdram_params)
 {
-	unsigned int chan;
+	unsigned int channel;
 	u32 sys_reg = 0;
 
-	sys_reg |= sdram_params->base.dramtype << SYS_REG_DDRTYPE_SHIFT;
-	sys_reg |= (sdram_params->num_channels - 1) << SYS_REG_NUM_CH_SHIFT;
-	for (chan = 0; chan < sdram_params->num_channels; chan++) {
+	sys_reg |= SYS_REG_ENC_DDRTYPE(sdram_params->base.dramtype);
+	sys_reg |= SYS_REG_ENC_NUM_CH(sdram_params->num_channels);
+	for (channel = 0; channel < sdram_params->num_channels; channel++) {
 		const struct rk3288_sdram_channel *info =
-			&sdram_params->ch[chan];
+			&(sdram_params->ch[channel]);
+		sys_reg |= SYS_REG_ENC_ROW_3_4(info->row_3_4, channel);
+		sys_reg |= SYS_REG_ENC_CHINFO(channel);
+		sys_reg |= SYS_REG_ENC_RANK(info->rank, channel);
+		sys_reg |= SYS_REG_ENC_COL(info->col, channel);
+		sys_reg |= SYS_REG_ENC_BK(info->bk, channel);
+		sys_reg |= SYS_REG_ENC_CS0_ROW(info->cs0_row, channel);
+		sys_reg |= SYS_REG_ENC_CS1_ROW(info->cs1_row, channel);
+		sys_reg |= SYS_REG_ENC_BW(info->bw, channel);
+		sys_reg |= SYS_REG_ENC_DBW(info->dbw, channel);
 
-		sys_reg |= info->row_3_4 << SYS_REG_ROW_3_4_SHIFT(chan);
-		sys_reg |= chan << SYS_REG_CHINFO_SHIFT(chan);
-		sys_reg |= (info->rank - 1) << SYS_REG_RANK_SHIFT(chan);
-		sys_reg |= (info->col - 9) << SYS_REG_COL_SHIFT(chan);
-		sys_reg |= info->bk == 3 ? 1 << SYS_REG_BK_SHIFT(chan) : 0;
-		sys_reg |= (info->cs0_row - 13) << SYS_REG_CS0_ROW_SHIFT(chan);
-		sys_reg |= (info->cs1_row - 13) << SYS_REG_CS1_ROW_SHIFT(chan);
-		sys_reg |= info->bw << SYS_REG_BW_SHIFT(chan);
-		sys_reg |= info->dbw << SYS_REG_DBW_SHIFT(chan);
-
-		dram_cfg_rbc(&dram->chan[chan], chan, sdram_params);
+		dram_cfg_rbc(&dram->chan[channel], channel, sdram_params);
 	}
+
 	writel(sys_reg, &dram->pmu->sys_reg[2]);
-	rk_clrsetreg(&dram->sgrf->soc_con2, 0x1f, sdram_params->base.stride);
+	writel(RK_CLRSETBITS(0x1F, sdram_params->base.stride),
+	       &dram->sgrf->soc_con2);
 }
 
 static int sdram_init(const struct dram_info *dram,
@@ -712,29 +710,22 @@ size_t sdram_size_mb(struct rk3288_pmu *pmu)
 	size_t size_mb = 0;
 	u32 ch;
 	u32 sys_reg = readl(&pmu->sys_reg[2]);
-	u32 chans;
+	u32 ch_num = SYS_REG_DEC_NUM_CH(sys_reg);
 
-	chans = 1 + ((sys_reg >> SYS_REG_NUM_CH_SHIFT) & SYS_REG_NUM_CH_MASK);
-
-	for (ch = 0; ch < chans; ch++) {
-		rank = 1 + (sys_reg >> SYS_REG_RANK_SHIFT(ch) &
-			SYS_REG_RANK_MASK);
-		col = 9 + (sys_reg >> SYS_REG_COL_SHIFT(ch) & SYS_REG_COL_MASK);
-		bk = sys_reg & (1 << SYS_REG_BK_SHIFT(ch)) ? 3 : 0;
-		cs0_row = 13 + (sys_reg >> SYS_REG_CS0_ROW_SHIFT(ch) &
-				SYS_REG_CS0_ROW_MASK);
-		cs1_row = 13 + (sys_reg >> SYS_REG_CS1_ROW_SHIFT(ch) &
-				SYS_REG_CS1_ROW_MASK);
-		bw = (sys_reg >> SYS_REG_BW_SHIFT(ch)) &
-			SYS_REG_BW_MASK;
-		row_3_4 = sys_reg >> SYS_REG_ROW_3_4_SHIFT(ch) &
-			SYS_REG_ROW_3_4_MASK;
+	for (ch = 0; ch < ch_num; ch++) {
+		rank = SYS_REG_DEC_RANK(sys_reg, ch);
+		col = SYS_REG_DEC_COL(sys_reg, ch);
+		bk = SYS_REG_DEC_BK(sys_reg, ch);
+		cs0_row = SYS_REG_DEC_CS0_ROW(sys_reg, ch);
+		cs1_row = SYS_REG_DEC_CS1_ROW(sys_reg, ch);
+		bw = SYS_REG_DEC_BW(sys_reg, ch);
+		row_3_4 = SYS_REG_DEC_ROW_3_4(sys_reg, ch);
 
 		chipsize_mb = (1 << (cs0_row + col + bk + bw - 20));
 
 		if (rank > 1)
 			chipsize_mb += chipsize_mb >>
-				(cs0_row - cs1_row);
+					(cs0_row - cs1_row);
 		if (row_3_4)
 			chipsize_mb = chipsize_mb * 3 / 4;
 		size_mb += chipsize_mb;
@@ -750,32 +741,6 @@ size_t sdram_size_mb(struct rk3288_pmu *pmu)
 }
 
 #ifdef CONFIG_SPL_BUILD
-# ifdef CONFIG_ROCKCHIP_FAST_SPL
-static int veyron_init(struct dram_info *priv)
-{
-	struct udevice *pmic;
-	int ret;
-
-	ret = uclass_first_device(UCLASS_PMIC, &pmic);
-	if (ret)
-		return ret;
-
-	/* Slowly raise to max CPU voltage to prevent overshoot */
-	ret = rk808_spl_configure_buck(pmic, 1, 1200000);
-	if (ret)
-		return ret;
-	udelay(175);/* Must wait for voltage to stabilize, 2mV/us */
-	ret = rk808_spl_configure_buck(pmic, 1, 1400000);
-	if (ret)
-		return ret;
-	udelay(100);/* Must wait for voltage to stabilize, 2mV/us */
-
-	rkclk_configure_cpu(priv->cru, priv->grf);
-
-	return 0;
-}
-# endif
-
 static int setup_sdram(struct udevice *dev)
 {
 	struct dram_info *priv = dev_get_priv(dev);
@@ -819,14 +784,6 @@ static int setup_sdram(struct udevice *dev)
 		return -EINVAL;
 	}
 
-# ifdef CONFIG_ROCKCHIP_FAST_SPL
-	if (!fdt_node_check_compatible(blob, 0, "google,veyron")) {
-		ret = veyron_init(priv);
-		if (ret)
-			return ret;
-	}
-# endif
-
 	return sdram_init(priv, &params);
 }
 #endif
@@ -844,9 +801,20 @@ static int rk3288_dmc_probe(struct udevice *dev)
 	priv->chan[1].msch = (struct rk3288_msch *)
 			(regmap_get_range(map, 0) + 0x80);
 
-	priv->grf = syscon_get_first_range(ROCKCHIP_SYSCON_GRF);
-	priv->sgrf = syscon_get_first_range(ROCKCHIP_SYSCON_SGRF);
-	priv->pmu = syscon_get_first_range(ROCKCHIP_SYSCON_PMU);
+	map = syscon_get_regmap_by_driver_data(ROCKCHIP_SYSCON_GRF);
+	if (IS_ERR(map))
+		return PTR_ERR(map);
+	priv->grf = regmap_get_range(map, 0);
+
+	map = syscon_get_regmap_by_driver_data(ROCKCHIP_SYSCON_SGRF);
+	if (IS_ERR(map))
+		return PTR_ERR(map);
+	priv->sgrf = regmap_get_range(map, 0);
+
+	map = syscon_get_regmap_by_driver_data(ROCKCHIP_SYSCON_PMU);
+	if (IS_ERR(map))
+		return PTR_ERR(map);
+	priv->pmu = regmap_get_range(map, 0);
 
 	ret = regmap_init_mem(dev, &map);
 	if (ret)
