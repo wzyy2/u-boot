@@ -9,11 +9,14 @@
 #include <dm.h>
 #include <ram.h>
 #include <asm/io.h>
-
+#include <asm/arch-rockchip/timer.h>
+ 
 DECLARE_GLOBAL_DATA_PTR;
 
 int board_init(void)
 {
+	rockchip_timer_init();
+
 	return 0;
 }
 
