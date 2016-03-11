@@ -4,7 +4,7 @@
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
-
+#define DEBUG
 #include <common.h>
 #include <dm.h>
 #include <backlight.h>
@@ -31,15 +31,17 @@ static int pwm_backlight_enable(struct udevice *dev)
 	uint duty_cycle;
 	int ret;
 
-	debug("%s: Enable '%s', regulator '%s'\n", __func__, dev->name,
-	      priv->reg->name);
-	ret = regulator_set_enable(priv->reg, true);
-	if (ret) {
-		debug("%s: Cannot enable regulator for PWM '%s'\n", __func__,
-		      dev->name);
-		return ret;
+	if (priv->reg) {
+		debug("%s: Enable '%s', regulator '%s'\n", __func__, dev->name,
+		      priv->reg->name);
+		ret = regulator_set_enable(priv->reg, true);
+		if (ret) {
+			debug("%s: Cannot enable regulator for PWM '%s'\n", __func__,
+			      dev->name);
+			return ret;
+		}
+		mdelay(120);
 	}
-	mdelay(120);
 
 	duty_cycle = priv->period_ns * (priv->default_level - priv->min_level) /
 		(priv->max_level - priv->min_level + 1);
@@ -67,10 +69,7 @@ static int pwm_backlight_ofdata_to_platdata(struct udevice *dev)
 
 	ret = uclass_get_device_by_phandle(UCLASS_REGULATOR, dev,
 					   "power-supply", &priv->reg);
-	if (ret) {
-		debug("%s: Cannot get power supply: ret=%d\n", __func__, ret);
-		return ret;
-	}
+
 	ret = gpio_request_by_name(dev, "enable-gpios", 0, &priv->enable,
 				   GPIOD_IS_OUT);
 	if (ret) {
