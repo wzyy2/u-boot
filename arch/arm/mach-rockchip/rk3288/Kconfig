@@ -33,6 +33,14 @@ config ROCKCHIP_FAST_SPL
 	  voltage. This option is only available on boards which support it
 	  and have the required PMIC code.
 
+config TARGET_TOM_RK3288
+	bool "Tom-RK3288"
+	help
+	  TOM is a RK3288-based development board with 5 USB ports,
+	  micro-SD card, audio, WiFi It also includes on-board eMMC and SDRAM.
+	  Expansion connectors provide access to display pins, I2C, SPI, UART
+	  and GPIOs.
+
 config SYS_SOC
 	default "rockchip"
 
@@ -45,4 +53,5 @@ source "board/firefly/firefly-rk3288/Kconfig"
 
 source "board/radxa/rock2/Kconfig"
 
+source "board/tom-rk3288/tom-rk3288/Kconfig"
 endif

@@ -23,6 +23,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
 	rk3288-firefly.dtb \
 	rk3288-jerry.dtb \
 	rk3288-rock2-square.dtb \
+	rk3288-tom.dtb \
 	rk3036-sdk.dtb
 dtb-$(CONFIG_TEGRA) += tegra20-harmony.dtb \
 	tegra20-medcom-wide.dtb \

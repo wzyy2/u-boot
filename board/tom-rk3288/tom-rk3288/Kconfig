@@ -1,0 +1,15 @@
+if TARGET_TOM_RK3288
+
+config SYS_BOARD
+	default "tom-rk3288"
+
+config SYS_VENDOR
+	default "tom-rk3288"
+
+config SYS_CONFIG_NAME
+	default "tom-rk3288"
+
+config BOARD_SPECIFIC_OPTIONS # dummy
+	def_bool y
+
+endif
