@@ -24,6 +24,8 @@
 #include <power/regulator.h>
 #include <power/rk808_pmic.h>
 
+#include "tee_tz_priv.h"
+
 DECLARE_GLOBAL_DATA_PTR;
 
 struct chan_info {
@@ -790,6 +792,21 @@ static int setup_sdram(struct udevice *dev)
 }
 #endif
 
+#define PsciFunctionChangeDdrfrq	0x82000008
+
+void smc_call_ddr_freq_change(int freq)
+{
+	struct smc_param param;
+	printk("smc_call_ddr_freq_change %dMHz\n", freq);
+
+	param.a0 = (long)PsciFunctionChangeDdrfrq;
+	param.a1 = freq;
+
+	tee_smc_call(&param);
+
+	printk("smc_call_ddr_freq_change result: %d\n", param.a0);
+}
+
 static int tom_init(struct dram_info *priv)
 {
 	struct udevice *pmic;
@@ -810,7 +827,7 @@ static int tom_init(struct dram_info *priv)
 	udelay(100);/* Must wait for voltage to stabilize, 2mV/us */
 
 	rkclk_configure_cpu(priv->cru, priv->grf);
-
+	smc_call_ddr_freq_change(480);
 	return 0;
 }
 
@@ -869,6 +886,7 @@ static int rk3288_dmc_probe(struct udevice *dev)
 		if (ret)
 			return ret;
 	}
+
 #endif
 	priv->info.base = 0;
 	priv->info.size = sdram_size_mb(priv->pmu) << 20;
