@@ -57,6 +57,16 @@ enum {
 	/* PLL CON3 */
 	PLL_RESET_SHIFT		= 5,
 
+	/* CLKSEL0 */
+	CORE_SEL_PLL_MASK	= 1,
+	CORE_SEL_PLL_SHIFT	= 15,
+	A17_DIV_MASK		= 0x1f,
+	A17_DIV_SHIFT		= 8,
+	MP_DIV_MASK		= 0xf,
+	MP_DIV_SHIFT		= 4,
+	M0_DIV_MASK		= 0xf,
+	M0_DIV_SHIFT		= 0,
+
 	/* CLKSEL1: pd bus clk pll sel: codec or general */
 	PD_BUS_SEL_PLL_MASK	= 15,
 	PD_BUS_SEL_CPLL		= 0,
@@ -75,6 +85,16 @@ enum {
 	PD_BUS_ACLK_DIV0_MASK	= 0x1f,
 	PD_BUS_ACLK_DIV1_SHIFT	= 0,
 	PD_BUS_ACLK_DIV1_MASK	= 0x7,
+
+	/*
+	 * CLKSEL10
+	 * peripheral bus pclk div:
+	 * aclk_bus: pclk_bus = 1:1 or 2:1 or 4:1 or 8:1
+	 */
+	PERI_SEL_PLL_MASK	 = 1,
+	PERI_SEL_PLL_SHIFT	 = 15,
+	PERI_SEL_CPLL		= 0,
+	PERI_SEL_GPLL,
 
 	/*
 	 * CLKSEL10
@@ -115,6 +135,12 @@ enum {
 	NPLL_MODE_SHIFT		= 14,
 	NPLL_MODE_SLOW		= 0,
 	NPLL_MODE_NORM,
+
+	APLL_MODE_SHIFT		= 0,
+	APLL_MODE_MASK		= 3,
+	APLL_MODE_SLOW		= 0,
+	APLL_MODE_NORM,
+	APLL_MODE_DEEP,
 
 	SOCSTS_DPLL_LOCK	= 1 << 5,
 	SOCSTS_APLL_LOCK	= 1 << 6,
@@ -222,7 +248,6 @@ static int rkclk_configure_ddr(struct rk3288_cru *cru, struct rk3288_grf *grf,
 
 	return 0;
 }
-
 #ifdef CONFIG_SPL_BUILD
 static void rkclk_init(struct rk3288_cru *cru, struct rk3288_grf *grf)
 {
@@ -290,6 +315,7 @@ static void rkclk_init(struct rk3288_cru *cru, struct rk3288_grf *grf)
 		     PERI_PCLK_DIV_MASK << PERI_PCLK_DIV_SHIFT |
 		     PERI_HCLK_DIV_MASK << PERI_HCLK_DIV_SHIFT |
 		     PERI_ACLK_DIV_MASK << PERI_ACLK_DIV_SHIFT,
+		     PERI_SEL_GPLL << PERI_SEL_PLL_SHIFT |
 		     pclk_div << PERI_PCLK_DIV_SHIFT |
 		     hclk_div << PERI_HCLK_DIV_SHIFT |
 		     aclk_div << PERI_ACLK_DIV_SHIFT);
@@ -299,9 +325,54 @@ static void rkclk_init(struct rk3288_cru *cru, struct rk3288_grf *grf)
 		     GPLL_MODE_MASK << GPLL_MODE_SHIFT |
 		     CPLL_MODE_MASK << CPLL_MODE_SHIFT,
 		     GPLL_MODE_NORM << GPLL_MODE_SHIFT |
-		     GPLL_MODE_NORM << CPLL_MODE_SHIFT);
+		     CPLL_MODE_NORM << CPLL_MODE_SHIFT);
 }
 #endif
+void rkclk_configure_cpu(struct rk3288_cru *cru, struct rk3288_grf *grf)
+{
+	/* pll enter slow-mode */
+	rk_clrsetreg(&cru->cru_mode_con,
+		     APLL_MODE_MASK << APLL_MODE_SHIFT,
+		     APLL_MODE_SLOW << APLL_MODE_SHIFT);
+
+	rkclk_set_pll(cru, CLK_ARM, &apll_init_cfg);
+
+	/* waiting for pll lock */
+	while (!(readl(&grf->soc_status[1]) & SOCSTS_APLL_LOCK))
+		udelay(1);
+
+	/*
+	 * core clock pll source selection and
+	 * set up dependent divisors for MPAXI/M0AXI and ARM clocks.
+	 * core clock select apll, apll clk = 1800MHz
+	 * arm clk = 1800MHz, mpclk = 450MHz, m0clk = 900MHz
+	 */
+	rk_clrsetreg(&cru->cru_clksel_con[0],
+		     CORE_SEL_PLL_MASK << CORE_SEL_PLL_SHIFT |
+		     A17_DIV_MASK << A17_DIV_SHIFT |
+		     MP_DIV_MASK << MP_DIV_SHIFT |
+		     M0_DIV_MASK << M0_DIV_SHIFT,
+		     0 << A17_DIV_SHIFT |
+		     3 << MP_DIV_SHIFT |
+		     1 << M0_DIV_SHIFT);
+
+	/*
+	 * set up dependent divisors for L2RAM/ATCLK and PCLK clocks.
+	 * l2ramclk = 900MHz, atclk = 450MHz, pclk_dbg = 450MHz
+	 */
+	rk_clrsetreg(&cru->cru_clksel_con[37],
+		     CLK_L2RAM_DIV_MASK << CLK_L2RAM_DIV_SHIFT |
+		     ATCLK_CORE_DIV_CON_MASK << ATCLK_CORE_DIV_CON_SHIFT |
+		     PCLK_CORE_DBG_DIV_MASK >> PCLK_CORE_DBG_DIV_SHIFT,
+		     1 << CLK_L2RAM_DIV_SHIFT |
+		     3 << ATCLK_CORE_DIV_CON_SHIFT |
+		     3 << PCLK_CORE_DBG_DIV_SHIFT);
+
+	/* PLL enter normal-mode */
+	rk_clrsetreg(&cru->cru_mode_con,
+		     APLL_MODE_MASK << APLL_MODE_SHIFT,
+		     APLL_MODE_NORM << APLL_MODE_SHIFT);
+}
 
 /* Get pll rate by id */
 static uint32_t rkclk_pll_get_rate(struct rk3288_cru *cru,
@@ -508,6 +579,33 @@ static ulong rockchip_spi_set_clk(struct rk3288_cru *cru, uint clk_general_rate,
 	return rockchip_spi_get_clk(cru, clk_general_rate, periph);
 }
 
+static ulong rk3288_get_periph_rate(struct udevice *dev, int periph)
+{
+	struct rk3288_clk_priv *priv = dev_get_priv(dev);
+	struct udevice *gclk;
+	ulong new_rate, gclk_rate;
+	int ret;
+
+	ret = uclass_get_device(UCLASS_CLK, CLK_GENERAL, &gclk);
+	if (ret)
+		return ret;
+	gclk_rate = clk_get_rate(gclk);
+
+	switch (periph) {
+	case PERIPH_ID_I2C0:
+	case PERIPH_ID_I2C1:
+	case PERIPH_ID_I2C2:
+	case PERIPH_ID_I2C3:
+	case PERIPH_ID_I2C4:
+	case PERIPH_ID_I2C5:
+		return gclk_rate;
+	default:
+		return -ENOENT;
+	}
+
+	return new_rate;
+}
+
 ulong rk3288_set_periph_rate(struct udevice *dev, int periph, ulong rate)
 {
 	struct rk3288_clk_priv *priv = dev_get_priv(dev);
@@ -536,6 +634,7 @@ static struct clk_ops rk3288_clk_ops = {
 	.get_rate	= rk3288_clk_get_rate,
 	.set_rate	= rk3288_clk_set_rate,
 	.set_periph_rate = rk3288_set_periph_rate,
+	.get_periph_rate = rk3288_get_periph_rate,
 };
 
 static int rk3288_clk_probe(struct udevice *dev)

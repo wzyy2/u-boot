@@ -21,6 +21,8 @@
 #include <asm/arch/pmu_rk3288.h>
 #include <asm/arch/sdram.h>
 #include <linux/err.h>
+#include <power/regulator.h>
+#include <power/rk808_pmic.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -788,10 +790,35 @@ static int setup_sdram(struct udevice *dev)
 }
 #endif
 
+static int tom_init(struct dram_info *priv)
+{
+	struct udevice *pmic;
+	int ret;
+
+	ret = uclass_first_device(UCLASS_PMIC, &pmic);
+	if (ret)
+		return ret;
+
+	/* Slowly raise to max CPU voltage to prevent overshoot */
+	ret = rk808_spl_configure_buck(pmic, 1, 1200000);
+	if (ret)
+		return ret;
+	udelay(175);/* Must wait for voltage to stabilize, 2mV/us */
+	ret = rk808_spl_configure_buck(pmic, 1, 1400000);
+	if (ret)
+		return ret;
+	udelay(100);/* Must wait for voltage to stabilize, 2mV/us */
+
+	rkclk_configure_cpu(priv->cru, priv->grf);
+
+	return 0;
+}
+
 static int rk3288_dmc_probe(struct udevice *dev)
 {
 	struct dram_info *priv = dev_get_priv(dev);
 	struct regmap *map;
+	const void *blob = gd->fdt_blob;
 	int ret;
 
 	map = syscon_get_regmap_by_driver_data(ROCKCHIP_SYSCON_NOC);
@@ -835,6 +862,13 @@ static int rk3288_dmc_probe(struct udevice *dev)
 	ret = setup_sdram(dev);
 	if (ret)
 		return ret;
+#endif
+#ifndef CONFIG_SPL_BUILD
+	if (!fdt_node_check_compatible(blob, 0, "tom-rk3288,tom-rk3288")) {
+		ret = tom_init(priv);
+		if (ret)
+			return ret;
+	}
 #endif
 	priv->info.base = 0;
 	priv->info.size = sdram_size_mb(priv->pmu) << 20;

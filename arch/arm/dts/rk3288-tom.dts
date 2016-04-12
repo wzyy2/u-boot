@@ -199,21 +199,20 @@
 &i2c0 {
 	status = "okay";
 
-	clock-frequency = <400000>;
-	i2c-scl-falling-time-ns = <50>;		/* 2.5ns measured */
-	i2c-scl-rising-time-ns = <100>;		/* 45ns measured */
+	clock-frequency = <200000>;
+	u-boot,dm-pre-reloc;
 
 	rk808: pmic@1b {
 		compatible = "rockchip,rk808";
 		clock-output-names = "xin32k", "wifibt_32kin";
 		interrupt-parent = <&gpio0>;
 		interrupts = <4 IRQ_TYPE_LEVEL_LOW>;
-		pinctrl-names = "default";
-		pinctrl-0 = <&pmic_int_l>;
+
 		reg = <0x1b>;
 		rockchip,system-power-controller;
 		wakeup-source;
 		#clock-cells = <1>;
+		u-boot,dm-pre-reloc;
 
 		vcc1-supply = <&vcc38_sys>;
 		vcc2-supply = <&vcc38_sys>;
