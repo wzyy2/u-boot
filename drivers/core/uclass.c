@@ -216,7 +216,9 @@ int uclass_find_device_by_name(enum uclass_id id, const char *name,
 		return ret;
 
 	list_for_each_entry(dev, &uc->dev_head, uclass_node) {
+		printk("%s %s 111\n", __func__, dev->name);
 		if (!strncmp(dev->name, name, strlen(name))) {
+
 			*devp = dev;
 			return 0;
 		}

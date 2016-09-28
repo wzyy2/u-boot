@@ -18,13 +18,17 @@ int rk3399_sysreset_request(struct udevice *dev, enum sysreset_t type)
 {
 	struct rk3399_cru *cru = rockchip_get_cru();
 
+	printk("1111111111111 %d\n;", type);
+
 	if (IS_ERR(cru))
 		return PTR_ERR(cru);
 	switch (type) {
 	case SYSRESET_WARM:
+		printk("2222222\n;");
 		writel(0xeca8, &cru->glb_srst_snd_value);
 		break;
 	case SYSRESET_COLD:
+		printk("3333333\n;");
 		writel(0xfdb9, &cru->glb_srst_fst_value);
 		break;
 	default:

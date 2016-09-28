@@ -802,16 +802,16 @@ void *rockchip_get_cru(void)
 static int rk3399_clk_probe(struct udevice *dev)
 {
 	struct rk3399_clk_priv *priv = dev_get_priv(dev);
-
+	printk("%s %d \n", __func__, __LINE__);
 	rkclk_init(priv->cru);
-
+	printk("%s %d \n", __func__, __LINE__);
 	return 0;
 }
 
 static int rk3399_clk_ofdata_to_platdata(struct udevice *dev)
 {
 	struct rk3399_clk_priv *priv = dev_get_priv(dev);
-
+	printk("%s %d \n", __func__, __LINE__);
 	priv->cru = (struct rk3399_cru *)dev_get_addr(dev);
 
 	return 0;

@@ -21,7 +21,7 @@ int sysreset_request(struct udevice *dev, enum sysreset_t type)
 
 	if (!ops->request)
 		return -ENOSYS;
-
+	printk("44444444\n;");
 	return ops->request(dev, type);
 }
 
@@ -29,7 +29,7 @@ int sysreset_walk(enum sysreset_t type)
 {
 	struct udevice *dev;
 	int ret = -ENOSYS;
-
+	printk("555555   %d\n;", type);
 	while (ret != -EINPROGRESS && type < SYSRESET_COUNT) {
 		for (uclass_first_device(UCLASS_SYSRESET, &dev);
 		     dev;
@@ -47,7 +47,7 @@ int sysreset_walk(enum sysreset_t type)
 void sysreset_walk_halt(enum sysreset_t type)
 {
 	int ret;
-
+	printk("66666\n;");
 	ret = sysreset_walk(type);
 
 	/* Wait for the reset to take effect */
@@ -70,6 +70,7 @@ void reset_cpu(ulong addr)
 
 int do_reset(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
+	printk("7777777\n;");
 	sysreset_walk_halt(SYSRESET_WARM);
 
 	return 0;
