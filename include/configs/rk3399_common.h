@@ -95,4 +95,7 @@
 /* rockchip xhci host driver */
 #define CONFIG_SYS_USB_XHCI_MAX_ROOT_PORTS	2
 
+#define CONFIG_USB_FUNCTION_MASS_STORAGE
+#define CONFIG_CMD_USB_MASS_STORAGE
+
 #endif
