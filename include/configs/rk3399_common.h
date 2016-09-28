@@ -67,7 +67,12 @@
 #define CONFIG_PARTITION_UUIDS
 #define PARTS_DEFAULT \
 	"uuid_disk=${uuid_gpt_disk};" \
-	"name=boot,start=16M,size=32M,bootable;" \
+	"name=loader1,start=32K,size=4000K,uuid=${uuid_gpt_loader1};" \
+	"name=reserved1,size=64K,uuid=${uuid_gpt_reserved1};" \
+	"name=reserved2,size=4M,uuid=${uuid_gpt_reserved2};" \
+	"name=loader2,size=4MB,uuid=${uuid_gpt_loader2};" \
+	"name=atf,size=4M,uuid=${uuid_gpt_atf};" \
+	"name=boot,size=128M,bootable,uuid=${uuid_gpt_boot};" \
 	"name=rootfs,size=-,uuid=${uuid_gpt_rootfs};\0" \
 
 /* First try to boot from SD (index 0), then eMMC (index 1) */

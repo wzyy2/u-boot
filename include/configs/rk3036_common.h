@@ -88,6 +88,17 @@
 	"kernel_addr_r=0x62000000\0" \
 	"ramdisk_addr_r=0x64000000\0"
 
+#define CONFIG_RANDOM_UUID
+#define PARTS_DEFAULT \
+	"uuid_disk=${uuid_gpt_disk};" \
+	"name=loader1,start=32K,size=4000K,uuid=${uuid_gpt_loader1};" \
+	"name=reserved1,size=64K,uuid=${uuid_gpt_reserved1};" \
+	"name=reserved2,size=4M,uuid=${uuid_gpt_reserved2};" \
+	"name=loader2,size=4MB,uuid=${uuid_gpt_loader2};" \
+	"name=atf,size=4M,uuid=${uuid_gpt_atf};" \
+	"name=boot,size=128M,bootable,uuid=${uuid_gpt_boot};" \
+	"name=rootfs,size=-,uuid=${uuid_gpt_rootfs};\0" \
+
 /* First try to boot from SD (index 0), then eMMC (index 1 */
 #define BOOT_TARGET_DEVICES(func) \
 	func(MMC, mmc, 0) \
