@@ -36,7 +36,7 @@ static int arasan_sdhci_probe(struct udevice *dev)
 
 	host->quirks = SDHCI_QUIRK_WAIT_SEND_CMD;
 
-	ret = sdhci_setup_cfg(&plat->cfg, host, CONFIG_ROCKCHIP_SDHCI_MAX_FREQ,
+	ret = sdhci_setup_cfg(&plat->cfg, host, 200 * 100000,
 			EMMC_MIN_FREQ);
 
 	host->mmc = &plat->mmc;
